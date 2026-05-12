@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  minio:
+    image: minio/minio
+    container_name: portfolio_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    networks:
+      - portfolio_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: portfolio_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - portfolio_net
+
+volumes:
+  minio_data:
+
+networks:
+  portfolio_net:
+    external: true 
