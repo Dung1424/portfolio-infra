@@ -17,6 +17,24 @@ services:
     networks:
       - portfolio_net
 
+  # Tạo bucket mặc định (Laravel AWS_BUCKET=portfolio, Node chat/). Client S3 trong container phải gọi http://minio:9000 — không dùng hostname có "_".
+  minio-init:
+    image: minio/mc
+    container_name: portfolio_minio_init
+    depends_on:
+      - minio
+    networks:
+      - portfolio_net
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set dock http://minio:9000 admin password123;
+      mc mb --ignore-existing dock/portfolio;
+      mc mb --ignore-existing dock/chat;
+      exit 0;
+      "
+    restart: "no"
+
   redis:
     image: redis:7-alpine
     container_name: portfolio_redis
