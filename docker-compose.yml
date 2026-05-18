@@ -38,14 +38,18 @@ services:
   redis:
     image: redis:7-alpine
     container_name: portfolio_redis
+    command: ["redis-server", "--requirepass", "portfolio_redis_password"]
     ports:
-      - "6379:6379"
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
     restart: unless-stopped
     networks:
       - portfolio_net
 
 volumes:
   minio_data:
+  redis_data:
 
 networks:
   portfolio_net:
