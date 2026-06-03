@@ -1,10 +1,32 @@
-version: "3.8"
-
 services:
-  minio:
+  seaweedfs:
+    image: chrislusf/seaweedfs
+    container_name: portfolio_seaweedfs
+    command: mini -dir=/data -s3.allowedOrigins=* -s3.externalUrl=http://seaweedfs:8333
+    environment:
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: password123
+      S3_BUCKET: portfolio,chat
+    ports:
+      - "8333:8333"
+      - "9333:9333"
+      - "8888:8888"
+      - "23646:23646"
+    volumes:
+      - seaweedfs_data:/data
+    restart: unless-stopped
+    networks:
+      portfolio_net:
+        aliases:
+          - seaweedfs
+          - portfolio_seaweedfs
+
+  legacy-minio:
     image: minio/minio
-    container_name: portfolio_minio
+    container_name: portfolio_minio_legacy
     command: server /data --console-address ":9001"
+    profiles:
+      - migration
     environment:
       MINIO_ROOT_USER: admin
       MINIO_ROOT_PASSWORD: password123
@@ -13,25 +35,29 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
-    restart: unless-stopped
+    restart: "no"
     networks:
       - portfolio_net
 
-  # Tạo bucket mặc định (Laravel AWS_BUCKET=portfolio, Node chat/). Client S3 trong container phải gọi http://minio:9000 — không dùng hostname có "_".
-  minio-init:
+  storage-migrate:
     image: minio/mc
-    container_name: portfolio_minio_init
+    container_name: portfolio_storage_migrate
+    profiles:
+      - migration
     depends_on:
-      - minio
+      - seaweedfs
+      - legacy-minio
     networks:
       - portfolio_net
     entrypoint: >
       /bin/sh -c "
-      sleep 3;
-      mc alias set dock http://minio:9000 admin password123;
-      mc mb --ignore-existing dock/portfolio;
-      mc mb --ignore-existing dock/chat;
-      exit 0;
+      sleep 5;
+      mc alias set old http://legacy-minio:9000 admin password123;
+      mc alias set new http://seaweedfs:8333 admin password123;
+      mc mb --ignore-existing new/portfolio;
+      mc mb --ignore-existing new/chat;
+      mc mirror --overwrite old/portfolio new/portfolio;
+      mc mirror --overwrite old/chat new/chat;
       "
     restart: "no"
 
@@ -48,9 +74,10 @@ services:
       - portfolio_net
 
 volumes:
+  seaweedfs_data:
   minio_data:
   redis_data:
 
 networks:
   portfolio_net:
-    external: true 
+    external: true
